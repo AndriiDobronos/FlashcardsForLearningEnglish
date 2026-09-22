@@ -1,0 +1,18 @@
+"use client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { applyReview } from "@/lib/scheduler";
+import { loadProgress, saveProgress, seedCards, type Direction, type Progress } from "@/lib/data";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { syncReview } from "@/lib/progress-sync";
+export default function StudyPage(){
+ const [index,setIndex]=useState(0); const [flipped,setFlipped]=useState(false); const [direction,setDirection]=useState<Direction>("en-uk"); const [progress,setProgress]=useState<Progress[]>([]); const [syncMessage,setSyncMessage]=useState(""); const card=useMemo(()=>seedCards[index%seedCards.length],[index]);
+ useEffect(()=>setProgress(loadProgress()),[]);
+ const speakEnglish=useCallback(()=>{if(typeof window!=="undefined"){const u=new SpeechSynthesisUtterance(card.en);u.lang="en-US";window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}},[card.en]);
+ useEffect(()=>{if(direction!=="en-uk")return;const timer=window.setTimeout(speakEnglish,120);return()=>window.clearTimeout(timer)},[card.id,direction,speakEnglish]);
+ const review=async(known:boolean)=>{const current=progress.find(p=>p.cardId===card.id&&p.direction===direction);const next=applyReview(current,card.id,direction,known);const other=progress.find(p=>p.cardId===card.id&&p.direction!==direction);next.learned=next.successCount>=2&&(other?.successCount??0)>=2;const updated=[...progress.filter(p=>!(p.cardId===card.id&&p.direction===direction)),next];setProgress(updated);saveProgress(updated);const supabase=getSupabaseBrowserClient();if(!supabase){setSyncMessage("Локальний режим: Supabase не підключено")}else{const{data,error:authError}=await supabase.auth.getUser();if(authError||!data.user){setSyncMessage("Увійдіть через email, щоб синхронізувати прогрес")}else{try{await syncReview(data.user.id,card.id,direction,known,next);setSyncMessage("✓ Прогрес синхронізовано")}catch(error){console.error("Supabase progress sync failed",error);const details=typeof error==="object"&&error!==null&&"message" in error?String(error.message):"Невідома помилка Supabase";const code=typeof error==="object"&&error!==null&&"code" in error?` [код ${String(error.code)}]`:"";setSyncMessage(`Помилка синхронізації: ${details}${code}`)}}}setDirection(known?(direction==="en-uk"?"uk-en":"en-uk"):direction);setIndex(index+1);setFlipped(false)};
+ const current=progress.find(p=>p.cardId===card.id&&p.direction===direction);
+ return <div className="study-layout"><div className="eyebrow">Сесія на сьогодні</div><h2>Тримай ритм</h2><div className="study-meta"><span>{index+1} з {seedCards.length} демо-карток</span><span>{current?.successCount??0}/2 у цьому напрямку</span></div><div className="flashcard" onClick={()=>setFlipped(!flipped)}><div className="word">{flipped?(direction==="en-uk"?card.uk:card.en):(direction==="en-uk"?card.en:card.uk)}</div>{flipped?<><div className="translation">{direction==="en-uk"?card.en:card.uk}</div><div className="hint">{card.example}</div></>:<div className="hint">Натисни, щоб перевернути</div>}</div><div className="actions"><button className="swipe no" onClick={()=>review(false)} aria-label="Ще не знаю">←</button>{direction==="en-uk"&&<button className="button secondary" onClick={speakEnglish}>🔊 Прослухати англійською</button>}<button className="swipe yes" onClick={()=>review(true)} aria-label="Знаю">→</button></div>{syncMessage&&<p role="status" style={{color:syncMessage.startsWith("✓")?"#16803c":"#9a3412"}}>{syncMessage}</p>}<p>Ліворуч — повторити. Праворуч — знаю. Прогрес зберігається у браузері.</p><Link href="/" className="eyebrow">← До прогресу</Link></div>;
+}
+
+
