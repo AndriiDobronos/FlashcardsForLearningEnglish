@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { loadCatalog, type Theme } from "@/lib/catalog";
 import { seedCards, type Card } from "@/lib/data";
+import { getCardImageUrl } from "@/lib/card-image";
 
 const SELECTED_KEY="wordly-selected-cards-v1";
-const imageFor=(card:Card)=>card.imageUrl??`https://loremflickr.com/640/360/${encodeURIComponent(`${card.en},cartoon`)}`;
 
 export default function SetsPage(){
   const[selected,setSelected]=useState<string[]>([]);
@@ -36,7 +36,7 @@ export default function SetsPage(){
     </div>
     <div className="theme-grid">
       {visibleCards.map(card=><button className="theme-card" key={card.id} onClick={()=>toggle(card.id)} style={{textAlign:"left",border:selected.includes(card.id)?"2px solid var(--coral)":"1px solid var(--line)",opacity:selected.length>=30&&!selected.includes(card.id)?0.55:1}}>
-        <img className="card-image" src={imageFor(card)} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display="none"}} />
+        <img className="card-image" src={getCardImageUrl(card)} alt={`Ілюстрація до ${card.en}`} loading="lazy" />
         <div className="emoji">{card.emoji}</div>
         <h3>{card.en}</h3>
         <p>{card.uk}</p>
