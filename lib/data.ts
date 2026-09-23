@@ -12,3 +12,13 @@ export const seedCards: Card[] = [
 const KEY="wordly-progress-v1";
 export function loadProgress(): Progress[]{if(typeof window==="undefined")return[];try{return JSON.parse(localStorage.getItem(KEY)??"[]") as Progress[]}catch{return[]}}
 export function saveProgress(progress:Progress[]){if(typeof window!=="undefined")localStorage.setItem(KEY,JSON.stringify(progress))}
+
+export function mergeProgress(local:Progress[], remote:Progress[]):Progress[]{
+ const merged=new Map(local.map(item=>[`${item.cardId}:${item.direction}`,item]));
+ for(const item of remote){
+  const key=`${item.cardId}:${item.direction}`;
+  const current=merged.get(key);
+  if(!current||new Date(item.lastReviewedAt??0).getTime()>=new Date(current.lastReviewedAt??0).getTime())merged.set(key,item);
+ }
+ return Array.from(merged.values());
+}

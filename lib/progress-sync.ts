@@ -25,3 +25,11 @@ export async function migrateLocalProgress(userId:string) {
   if (error) throw error;
   return { migrated: rows.length };
 }
+
+export async function loadRemoteProgress(userId:string):Promise<Progress[]> {
+  const supabase=getSupabaseBrowserClient();
+  if(!supabase)return [];
+  const{data,error}=await supabase.from("user_card_progress").select("card_id,direction,success_count,failure_count,due_at,learned,last_reviewed_at").eq("user_id",userId);
+  if(error)throw error;
+  return (data??[]).map(item=>({cardId:item.card_id,direction:item.direction as Direction,successCount:item.success_count,failureCount:item.failure_count,dueAt:item.due_at,learned:item.learned,lastReviewedAt:item.last_reviewed_at??undefined}));
+}

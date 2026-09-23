@@ -2,13 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { applyReview } from "@/lib/scheduler";
-import { loadProgress, saveProgress, seedCards, type Direction, type Progress } from "@/lib/data";
+import { loadProgress, mergeProgress, saveProgress, seedCards, type Direction, type Progress } from "@/lib/data";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { syncReview } from "@/lib/progress-sync";
+import { loadRemoteProgress, syncReview } from "@/lib/progress-sync";
 import { loadCatalog } from "@/lib/catalog";
 export default function StudyPage(){
  const [index,setIndex]=useState(0); const [flipped,setFlipped]=useState(false); const [direction,setDirection]=useState<Direction>("en-uk"); const [progress,setProgress]=useState<Progress[]>([]); const [cards,setCards]=useState(seedCards); const [syncMessage,setSyncMessage]=useState(""); const card=useMemo(()=>cards[index%cards.length]??seedCards[0],[cards,index]);
- useEffect(()=>setProgress(loadProgress()),[]);
+ useEffect(()=>{let active=true;const hydrate=async()=>{const local=loadProgress();setProgress(local);const supabase=getSupabaseBrowserClient();if(!supabase)return;const{data}=await supabase.auth.getUser();if(!data.user)return;try{const remote=await loadRemoteProgress(data.user.id);if(active&&remote.length){const merged=mergeProgress(local,remote);setProgress(merged);saveProgress(merged)}}catch(error){console.error("Remote progress load failed",error)}};void hydrate();return()=>{active=false}},[]);
  useEffect(()=>{const selected=JSON.parse(localStorage.getItem("wordly-selected-v1")??"[]") as string[];loadCatalog().then(({cards:catalogCards})=>{const filtered=selected.length?catalogCards.filter(item=>selected.includes(item.theme)):catalogCards;setCards(filtered.length?filtered:catalogCards)})},[]);
  const speakEnglish=useCallback(()=>{if(typeof window!=="undefined"){const u=new SpeechSynthesisUtterance(card.en);u.lang="en-US";window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}},[card.en]);
  useEffect(()=>{if(direction!=="en-uk")return;const timer=window.setTimeout(speakEnglish,120);return()=>window.clearTimeout(timer)},[card.id,direction,speakEnglish]);
