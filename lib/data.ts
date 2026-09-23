@@ -1,5 +1,5 @@
 export type Direction = "en-uk" | "uk-en";
-export type Card = { id:string; theme:string; themeLabel:string; en:string; uk:string; example:string; emoji:string };
+export type Card = { id:string; theme:string; themeLabel:string; en:string; uk:string; example:string; emoji:string; imageUrl?:string };
 export type Progress = { cardId:string; direction:Direction; successCount:number; failureCount:number; dueAt:string; learned:boolean; lastReviewedAt?:string };
 export const seedCards: Card[] = [
  {id:"travel-001",theme:"travel",themeLabel:"Подорожі",en:"to figure out",uk:"розібратися, зрозуміти",example:"I need time to figure out this problem.",emoji:"🧭"},
