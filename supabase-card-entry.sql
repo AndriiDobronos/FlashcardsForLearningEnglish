@@ -12,6 +12,21 @@ begin
     select 1 from pg_policies
     where schemaname='public'
       and tablename='cards'
+      and policyname='Anyone can read cards'
+  ) then
+    create policy "Anyone can read cards"
+      on public.cards for select
+      to anon, authenticated
+      using (true);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public'
+      and tablename='cards'
       and policyname='Authenticated users add cards'
   ) then
     create policy "Authenticated users add cards"

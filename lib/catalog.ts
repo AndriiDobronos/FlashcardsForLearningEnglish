@@ -17,7 +17,7 @@ export async function loadCatalog(){
 
   const[{data:themeRows,error:themeError},{data:cardRows,error:cardError}]=await Promise.all([
     supabase.from("themes").select("id,title,description,emoji").order("title"),
-    supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence,image_url").order("created_at"),
+    supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence").order("created_at"),
   ]);
 
   if(themeError||cardError||!themeRows?.length||!cardRows?.length)return {themes:fallbackThemes,cards:seedCards};
@@ -31,7 +31,6 @@ export async function loadCatalog(){
     uk:card.ukrainian_text,
     example:card.example_sentence,
     emoji:themeMap.get(card.theme_id)?.emoji??"📚",
-    imageUrl:card.image_url??undefined,
   }));
   const counts=new Map<string,number>();
   cards.forEach(card=>counts.set(card.theme,(counts.get(card.theme)??0)+1));
