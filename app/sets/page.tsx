@@ -12,13 +12,15 @@ export default function SetsPage(){
   const[themes,setThemes]=useState<Theme[]>([]);
   const[cards,setCards]=useState<Card[]>(seedCards);
   const[themeFilter,setThemeFilter]=useState("all");
+  const[search,setSearch]=useState("");
+  const[catalogError,setCatalogError]=useState("");
 
   useEffect(()=>{
     try{setSelected(JSON.parse(localStorage.getItem(SELECTED_KEY)??"[]"))}catch{setSelected([])}
-    loadCatalog().then(({themes:loadedThemes,cards:loadedCards})=>{setThemes(loadedThemes);setCards(loadedCards)});
+    loadCatalog().then(({themes:loadedThemes,cards:loadedCards,error})=>{setThemes(loadedThemes);setCards(loadedCards);setCatalogError(error??"")});
   },[]);
 
-  const visibleCards=useMemo(()=>themeFilter==="all"?cards:cards.filter(card=>card.theme===themeFilter),[cards,themeFilter]);
+  const visibleCards=useMemo(()=>cards.filter(card=>(themeFilter==="all"||card.theme===themeFilter)&&`${card.en} ${card.uk} ${card.themeLabel}`.toLowerCase().includes(search.toLowerCase().trim())),[cards,themeFilter,search]);
   const toggle=(id:string)=>{
     const next=selected.includes(id)?selected.filter(item=>item!==id):selected.length<30?[...selected,id]:selected;
     setSelected(next);
@@ -29,6 +31,9 @@ export default function SetsPage(){
     <div className="eyebrow">Бібліотека</div>
     <h1>Обери 30 карток для навчання.</h1>
     <p style={{maxWidth:620}}>Обирай окремі слова та фрази. Натисни на картку, щоб додати або прибрати її з навчальної сесії.</p>
+    <p className="catalog-count">У каталозі: <strong>{cards.length}</strong> карток · Для сесії потрібно обрати: <strong>30</strong></p>
+    {catalogError&&<p role="alert" className="catalog-error">Не вдалося завантажити актуальний каталог: {catalogError}</p>}
+    <input className="catalog-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Пошук слова або перекладу…" aria-label="Пошук картки" />
     <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"24px 0"}}>
       <button className="button secondary" onClick={()=>setThemeFilter("all")}>Усі теми</button>
       {themes.map(theme=><button className="button secondary" key={theme.id} onClick={()=>setThemeFilter(theme.id)}>{theme.emoji} {theme.title}</button>)}

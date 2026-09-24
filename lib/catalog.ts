@@ -11,16 +11,20 @@ const fallbackThemes:Theme[]=[
   {id:"verbs",title:"Фразові дієслова",description:"Корисні вирази для живої мови",emoji:"💬",cardCount:1},
 ];
 
-export async function loadCatalog(){
+export async function loadCatalog():Promise<{themes:Theme[];cards:Card[];error?:string}>{
   const supabase=getSupabaseBrowserClient();
-  if(!supabase)return {themes:fallbackThemes,cards:seedCards};
+  if(!supabase)return {themes:fallbackThemes,cards:seedCards,error:"Supabase не підключено"};
 
   const[{data:themeRows,error:themeError},{data:cardRows,error:cardError}]=await Promise.all([
     supabase.from("themes").select("id,title,description,emoji").order("title"),
     supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence").order("created_at"),
   ]);
 
-  if(themeError||cardError||!themeRows?.length||!cardRows?.length)return {themes:fallbackThemes,cards:seedCards};
+  if(themeError||cardError||!themeRows?.length||!cardRows?.length){
+    const error=themeError?.message??cardError?.message??"Каталог Supabase повернув порожні дані";
+    console.error("Catalog load failed",{themeError,cardError,themeRows:themeRows?.length,cardRows:cardRows?.length});
+    return {themes:fallbackThemes,cards:seedCards,error};
+  }
 
   const themeMap=new Map(themeRows.map(theme=>[theme.id,theme]));
   const cards:Card[]=cardRows.map(card=>({
