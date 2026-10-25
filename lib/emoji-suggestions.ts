@@ -1,6 +1,60 @@
 type EmojiEntry = { emoji: string; keywords: string[] };
 
 const emojiEntries: EmojiEntry[] = [
+  { emoji: "✈️", keywords: ["flight", "fly", "airplane", "airport", "travel", "подорож"] },
+  { emoji: "🛫", keywords: ["flight", "departure", "take off", "airport"] },
+  { emoji: "🧳", keywords: ["luggage", "suitcase", "travel", "trip"] },
+  { emoji: "🌍", keywords: ["world", "country", "abroad", "travel"] },
+  { emoji: "🏨", keywords: ["hotel", "room", "stay", "booking"] },
+  { emoji: "🗣️", keywords: ["speak", "talk", "conversation", "language"] },
+  { emoji: "📧", keywords: ["email", "message", "mail", "work"] },
+  { emoji: "💻", keywords: ["computer", "online", "office", "work"] },
+  { emoji: "🤝", keywords: ["meeting", "agree", "deal", "business"] },
+  { emoji: "🍌", keywords: ["banana", "fruit", "snack", "food"] },
+  { emoji: "🍕", keywords: ["pizza", "food", "meal", "restaurant"] },
+  { emoji: "☕", keywords: ["coffee", "drink", "cafe", "breakfast"] },
+  { emoji: "🍽️", keywords: ["restaurant", "dinner", "meal", "food"] },
+  { emoji: "🎂", keywords: ["birthday", "cake", "celebrate", "party"] },
+  { emoji: "❤️", keywords: ["love", "heart", "like", "feelings"] },
+  { emoji: "😊", keywords: ["happy", "smile", "glad", "joy"] },
+  { emoji: "😢", keywords: ["sad", "cry", "unhappy", "tears"] },
+  { emoji: "😡", keywords: ["angry", "mad", "annoyed", "emotion"] },
+  { emoji: "🤔", keywords: ["think", "wonder", "question", "consider"] },
+  { emoji: "🎯", keywords: ["goal", "target", "aim", "plan"] },
+  { emoji: "🚀", keywords: ["start", "launch", "success", "growth"] },
+  { emoji: "💰", keywords: ["money", "price", "salary", "pay", "cost"] },
+  { emoji: "🎁", keywords: ["gift", "present", "surprise", "give"] },
+  { emoji: "📖", keywords: ["book", "read", "learn", "study"] },
+  { emoji: "🎓", keywords: ["school", "university", "education", "learn"] },
+  { emoji: "🏃", keywords: ["run", "exercise", "sport", "quick"] },
+  { emoji: "⚽", keywords: ["football", "soccer", "sport", "game"] },
+  { emoji: "🌧️", keywords: ["rain", "weather", "storm", "wet"] },
+  { emoji: "☀️", keywords: ["sun", "sunny", "weather", "hot"] },
+  { emoji: "❄️", keywords: ["snow", "winter", "cold", "weather"] },
+  { emoji: "🌳", keywords: ["tree", "nature", "park", "green"] },
+  { emoji: "🐶", keywords: ["dog", "pet", "animal"] },
+  { emoji: "🐱", keywords: ["cat", "pet", "animal"] },
+  { emoji: "🚗", keywords: ["car", "drive", "road", "transport"] },
+  { emoji: "🚌", keywords: ["bus", "transport", "station", "travel"] },
+  { emoji: "🚲", keywords: ["bike", "bicycle", "ride", "transport"] },
+  { emoji: "🔑", keywords: ["key", "open", "door", "access"] },
+  { emoji: "🚪", keywords: ["door", "room", "enter", "house"] },
+  { emoji: "🛒", keywords: ["shop", "shopping", "buy", "store"] },
+  { emoji: "📱", keywords: ["phone", "call", "mobile", "contact"] },
+  { emoji: "🔔", keywords: ["notification", "bell", "reminder", "alert"] },
+  { emoji: "⚠️", keywords: ["warning", "danger", "careful", "attention"] },
+  { emoji: "❓", keywords: ["question", "what", "why", "unknown"] },
+  { emoji: "💡", keywords: ["idea", "light", "think", "solution"] },
+  { emoji: "🔨", keywords: ["build", "work", "repair", "tool"] },
+  { emoji: "🧹", keywords: ["clean", "cleaning", "tidy", "house"] },
+  { emoji: "🛏️", keywords: ["bed", "sleep", "bedroom", "rest"] },
+  { emoji: "🚿", keywords: ["shower", "bathroom", "wash", "clean"] },
+  { emoji: "👕", keywords: ["clothes", "shirt", "dress", "wear"] },
+  { emoji: "💊", keywords: ["medicine", "health", "doctor", "sick"] },
+  { emoji: "🏥", keywords: ["hospital", "doctor", "health", "sick"] },
+  { emoji: "📍", keywords: ["location", "place", "map", "where"] },
+  { emoji: "⏳", keywords: ["wait", "time", "delay", "future"] },
+  { emoji: "✈️", keywords: ["check in", "зареєструватися", "airport", "travel"] },
   { emoji: "🧭", keywords: ["figure out", "розібратися", "understand"] },
   { emoji: "🌅", keywords: ["fresh start", "новий початок", "start"] },
   { emoji: "🎫", keywords: ["boarding pass", "посадковий талон", "ticket"] },
@@ -31,14 +85,13 @@ const emojiEntries: EmojiEntry[] = [
   { emoji: "📌", keywords: ["put off", "відкладати", "delay"] },
   { emoji: "📰", keywords: ["come across", "натрапити", "article"] },
   { emoji: "✅", keywords: ["work out", "скластися", "success"] },
-  { emoji: "✈️", keywords: ["check in", "зареєструватися", "airport", "travel"] },
 ];
 
-export function suggestEmojis(text: string, limit = 6): string[] {
+export function suggestEmojis(text: string, limit = 12): string[] {
   const query = text.trim().toLocaleLowerCase();
   if (!query) return emojiEntries.slice(0, limit).map((entry) => entry.emoji);
   const words = query.split(/\s+/).filter(Boolean);
-  return emojiEntries
+  const ranked = emojiEntries
     .map((entry, index) => {
       const score = entry.keywords.reduce((total, keyword) => {
         const normalized = keyword.toLocaleLowerCase();
@@ -47,6 +100,9 @@ export function suggestEmojis(text: string, limit = 6): string[] {
       return { entry, score, index };
     })
     .sort((a, b) => b.score - a.score || a.index - b.index)
+    .filter(({ score }) => score > 0)
     .slice(0, limit)
     .map(({ entry }) => entry.emoji);
+
+  return ranked;
 }
