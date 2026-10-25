@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { loadCatalog, type Theme } from "@/lib/catalog";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { suggestEmojis } from "@/lib/emoji-suggestions";
+import { suggestEmojis, suggestEmojisFromFullIndex } from "@/lib/emoji-suggestions";
 
 export default function AddCardPage(){
   const [themes,setThemes]=useState<Theme[]>([]);
@@ -13,12 +13,13 @@ export default function AddCardPage(){
   const [ukrainian,setUkrainian]=useState("");
   const [example,setExample]=useState("");
   const [emoji,setEmoji]=useState("");
+  const [emojiOptions,setEmojiOptions]=useState<string[]>(()=>suggestEmojis(""));
   const [emojiManuallySelected,setEmojiManuallySelected]=useState(false);
   const [message,setMessage]=useState("");
   const [saving,setSaving]=useState(false);
 
   useEffect(()=>{loadCatalog().then(({themes:loadedThemes})=>{setThemes(loadedThemes);setThemeId(current=>current||loadedThemes[0]?.id||"")})},[]);
-  const emojiOptions=suggestEmojis(english);
+  useEffect(()=>{let active=true;suggestEmojisFromFullIndex(english).then(options=>{if(active)setEmojiOptions(options)});return()=>{active=false}},[english]);
   useEffect(()=>{if(!emojiManuallySelected)setEmoji(emojiOptions[0]??"")},[emojiManuallySelected,emojiOptions.join(",")]);
 
   const submit=async(event:FormEvent)=>{

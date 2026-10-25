@@ -87,11 +87,11 @@ const emojiEntries: EmojiEntry[] = [
   { emoji: "✅", keywords: ["work out", "скластися", "success"] },
 ];
 
-export function suggestEmojis(text: string, limit = 12): string[] {
+function rankEmojis(entries: EmojiEntry[], text: string, limit: number): string[] {
   const query = text.trim().toLocaleLowerCase();
   if (!query) return emojiEntries.slice(0, limit).map((entry) => entry.emoji);
   const words = query.split(/\s+/).filter(Boolean);
-  const ranked = emojiEntries
+  const ranked = entries
     .map((entry, index) => {
       const score = entry.keywords.reduce((total, keyword) => {
         const normalized = keyword.toLocaleLowerCase();
@@ -105,4 +105,33 @@ export function suggestEmojis(text: string, limit = 12): string[] {
     .map(({ entry }) => entry.emoji);
 
   return ranked;
+}
+
+const remoteEmojiIndexUrl = "https://emojibooks.com/data/emoji-index.v1.json";
+let fullEmojiEntries: EmojiEntry[] | null = null;
+let fullEmojiLoad: Promise<EmojiEntry[]> | null = null;
+
+export function suggestEmojis(text: string, limit = 12): string[] {
+  return rankEmojis(emojiEntries, text, limit);
+}
+
+export async function suggestEmojisFromFullIndex(text: string, limit = 12): Promise<string[]> {
+  if (!fullEmojiLoad) {
+    fullEmojiLoad = fetch(remoteEmojiIndexUrl, { cache: "force-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Emoji index request failed: ${response.status}`);
+        return response.json() as Promise<{ rows?: Array<[string, string, string, string, string]> }>;
+      })
+      .then((payload) => {
+        const seen = new Set<string>();
+        fullEmojiEntries = (payload.rows ?? [])
+          .map((row) => ({ emoji: row[0], keywords: `${row[2] ?? ""}|${row[4] ?? ""}`.split("|") }))
+          .filter((entry) => entry.emoji && !seen.has(entry.emoji) && seen.add(entry.emoji));
+        return fullEmojiEntries;
+      })
+      .catch(() => emojiEntries);
+  }
+
+  const entries = fullEmojiEntries ?? await fullEmojiLoad;
+  return rankEmojis(entries, text, limit);
 }
