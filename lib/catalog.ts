@@ -9,6 +9,7 @@ const fallbackThemes:Theme[]=[
   {id:"work",title:"Робота",description:"Зустрічі, листування та карʼєра",emoji:"💼",cardCount:1},
   {id:"home",title:"Дім",description:"Кімнати, побут і повсякденні справи",emoji:"🏠",cardCount:1},
   {id:"verbs",title:"Фразові дієслова",description:"Корисні вирази для живої мови",emoji:"💬",cardCount:1},
+  {id:"idioms",title:"Сталі вислови",description:"Природні англійські ідіоми та вирази",emoji:"💡",cardCount:0},
 ];
 
 export async function loadCatalog():Promise<{themes:Theme[];cards:Card[];error?:string}>{

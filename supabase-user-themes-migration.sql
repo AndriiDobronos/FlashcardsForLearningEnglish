@@ -1,6 +1,13 @@
 -- Wordly: per-user themes and ownership for personal cards.
 -- Run once in Supabase -> SQL Editor.
 
+insert into public.themes (id, title, description, emoji)
+values ('idioms', 'Сталі вислови', 'Природні англійські ідіоми та вирази', '💡')
+on conflict (id) do update set
+  title = excluded.title,
+  description = excluded.description,
+  emoji = excluded.emoji;
+
 alter table public.cards
   add column if not exists created_by uuid references auth.users(id) on delete set null;
 
@@ -39,3 +46,13 @@ on public.cards
 for delete
 to authenticated
 using (auth.uid() = created_by);
+
+grant update on table public.cards to authenticated;
+
+drop policy if exists "Users update own cards" on public.cards;
+create policy "Users update own cards"
+on public.cards
+for update
+to authenticated
+using (auth.uid() = created_by)
+with check (auth.uid() = created_by);

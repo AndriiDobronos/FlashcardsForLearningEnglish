@@ -4,7 +4,8 @@ insert into public.themes (id, title, description, emoji) values
 ('food','Їжа та напої','Замовлення, смаки та рецепти','🍳'),
 ('work','Робота','Зустрічі, листування та карʼєра','💼'),
 ('home','Дім','Кімнати, побут і повсякденні справи','🏠'),
-('verbs','Фразові дієслова','Корисні вирази для живої мови','💬')
+('verbs','Фразові дієслова','Корисні вирази для живої мови','💬'),
+('idioms','Сталі вислови','Природні англійські ідіоми та вирази','💡')
 on conflict (id) do update set title=excluded.title,description=excluded.description,emoji=excluded.emoji;
 
 insert into public.cards (id,theme_id,english_text,ukrainian_text,example_sentence) values
