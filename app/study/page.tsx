@@ -8,6 +8,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { loadRemoteProgress, syncReview } from "@/lib/progress-sync";
 import { loadCatalog } from "@/lib/catalog";
 import { buildSessionQueue, insertForLater, isCompletedToday, nextDirection, SESSION_TARGET } from "@/lib/session-planner";
+import { loadActiveThemeIds } from "@/lib/theme-preferences";
 
 export default function StudyPage() {
   const [cards, setCards] = useState(seedCards);
@@ -41,12 +42,14 @@ export default function StudyPage() {
         }
       }
 
-      const { cards: catalogCards } = await loadCatalog();
-      const dueCards = catalogCards.filter((item) => {
+      const { themes, cards: catalogCards } = await loadCatalog();
+      const activeThemeIds = await loadActiveThemeIds(themes.map((theme) => theme.id));
+      const themedCards = catalogCards.filter((item) => activeThemeIds.includes(item.theme));
+      const dueCards = themedCards.filter((item) => {
         const itemProgress = availableProgress.filter((entry) => entry.cardId === item.id);
         return itemProgress.length === 0 || itemProgress.some((entry) => !entry.learned && isDue(entry));
       });
-      const queue = buildSessionQueue(dueCards.length ? dueCards : catalogCards, availableProgress);
+      const queue = buildSessionQueue(dueCards.length ? dueCards : themedCards, availableProgress);
       if (active) {
         setProgress(availableProgress);
         setCards(queue);
@@ -147,9 +150,9 @@ export default function StudyPage() {
         <div className="word">{flipped ? (direction === "en-uk" ? card.uk : card.en) : (direction === "en-uk" ? card.en : card.uk)}</div>
         {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
         {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
-        {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()}>
-          <button className="card-chevron left" type="button" onClick={() => void review(false)} aria-label="Ще не знаю">‹</button>
-          <button className="card-chevron right" type="button" onClick={() => void review(true)} aria-label="Знаю">›</button>
+        {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
+          <button className="card-chevron left" type="button" onClick={(event) => { event.stopPropagation(); void review(false); }} aria-label="Ще не знаю">‹</button>
+          <button className="card-chevron right" type="button" onClick={(event) => { event.stopPropagation(); void review(true); }} aria-label="Знаю">›</button>
         </div>}
       </div>
       {syncMessage && <p role="status" style={{ color: "#9a3412" }}>{syncMessage}</p>}

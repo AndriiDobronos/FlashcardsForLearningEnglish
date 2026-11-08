@@ -1,5 +1,5 @@
 export type Direction = "en-uk" | "uk-en";
-export type Card = { id:string; theme:string; themeLabel:string; en:string; uk:string; example:string; emoji:string; imageUrl?:string };
+export type Card = { id:string; theme:string; themeLabel:string; en:string; uk:string; example:string; emoji:string; imageUrl?:string; createdBy?:string };
 export type Progress = {
  cardId:string;
  direction:Direction;

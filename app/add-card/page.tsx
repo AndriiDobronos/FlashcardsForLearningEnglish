@@ -31,7 +31,7 @@ export default function AddCardPage(){
     if(!user){setMessage("Спочатку увійдіть через email.");return}
     setSaving(true);
     const id=`${themeId}-${Date.now()}`;
-    const{error}=await supabase.from("cards").insert({id,theme_id:themeId,english_text:english.trim(),ukrainian_text:ukrainian.trim(),example_sentence:example.trim(),emoji:emoji.trim(),image_url:null});
+    const{error}=await supabase.from("cards").insert({id,theme_id:themeId,english_text:english.trim(),ukrainian_text:ukrainian.trim(),example_sentence:example.trim(),emoji:emoji.trim(),image_url:null,created_by:user.id});
     setSaving(false);
     if(error){setMessage(`Не вдалося додати картку: ${error.message}`);return}
     setEnglish("");setUkrainian("");setExample("");setEmoji("");setEmojiManuallySelected(false);

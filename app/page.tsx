@@ -24,8 +24,10 @@ function calculateStreak(activityDates:string[]){
 function calculateStats(progress:Progress[],events:ReviewEvent[]):Stats{
   const eventDates=events.map(event=>new Date(event.created_at)).filter(date=>!Number.isNaN(date.getTime()));
   const activityDates=[...eventDates,...progress.flatMap(item=>item.lastReviewedAt?[new Date(item.lastReviewedAt)]:[])].map(dateKey);
-  const learned=new Set(progress.filter(item=>item.learned).map(item=>item.cardId)).size;
-  const due=progress.filter(item=>!item.learned&&new Date(item.dueAt).getTime()<=Date.now()).length;
+  const byCard=new Map<string,Progress[]>();
+  progress.forEach(item=>byCard.set(item.cardId,[...(byCard.get(item.cardId)??[]),item]));
+  const learned=[...byCard.values()].filter(items=>items.length>=2?items.every(item=>item.learned):Boolean(items[0]?.learned)).length;
+  const due=[...byCard.values()].filter(items=>items.some(item=>!item.learned&&new Date(item.dueAt).getTime()<=Date.now())).length;
   const days=Array.from({length:5},(_,offset)=>{const date=new Date();date.setHours(0,0,0,0);date.setDate(date.getDate()-(4-offset));const value=eventDates.filter(event=>dateKey(event)===dateKey(date)).length||progress.filter(item=>item.lastReviewedAt&&dateKey(new Date(item.lastReviewedAt))===dateKey(date)).length;return{label:dayLabel(date),value}});
   return{streak:calculateStreak(activityDates),learned,due,days,loading:false};
 }
@@ -40,10 +42,10 @@ export default function Home(){
       const{data:userData}=await supabase.auth.getUser();
       if(!userData.user){setStats(calculateStats(local,[]));return;}
       const[{data:remoteProgress},{data:events}]=await Promise.all([
-        supabase.from("user_card_progress").select("card_id,learned,due_at,last_reviewed_at").eq("user_id",userData.user.id),
+        supabase.from("user_card_progress").select("card_id,direction,success_count,failure_count,due_at,learned,last_reviewed_at,total_reviews,total_known,total_unknown,session_known,session_unknown,success_streak,ease_factor,interval_days,last_session_date").eq("user_id",userData.user.id),
         supabase.from("review_events").select("created_at").eq("user_id",userData.user.id).gte("created_at",new Date(Date.now()-6*86400000).toISOString()),
       ]);
-      const progress:Progress[]=(remoteProgress??[]).map(item=>({cardId:item.card_id,direction:"en-uk",successCount:0,failureCount:0,dueAt:item.due_at,learned:item.learned,lastReviewedAt:item.last_reviewed_at??undefined,totalReviews:0,totalKnown:0,totalUnknown:0,sessionKnown:0,sessionUnknown:0,successStreak:0,easeFactor:2.3,intervalDays:0}));
+      const progress:Progress[]=(remoteProgress??[]).map(item=>({cardId:item.card_id,direction:item.direction as Progress["direction"],successCount:item.success_count??0,failureCount:item.failure_count??0,dueAt:item.due_at,learned:item.learned,lastReviewedAt:item.last_reviewed_at??undefined,totalReviews:item.total_reviews??0,totalKnown:item.total_known??0,totalUnknown:item.total_unknown??0,sessionKnown:item.session_known??0,sessionUnknown:item.session_unknown??0,successStreak:item.success_streak??0,easeFactor:Number(item.ease_factor??2.3),intervalDays:item.interval_days??0,lastSessionDate:item.last_session_date??undefined}));
       setStats(calculateStats(progress.length?progress:local,(events??[]) as ReviewEvent[]));
     };
     void load();

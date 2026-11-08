@@ -27,11 +27,11 @@ begin
     select 1 from pg_policies
     where schemaname='public'
       and tablename='cards'
-      and policyname='Authenticated users add cards'
+      and policyname='Users add own cards'
   ) then
-    create policy "Authenticated users add cards"
+    create policy "Users add own cards"
       on public.cards for insert
       to authenticated
-      with check (true);
+      with check (auth.uid() = created_by);
   end if;
 end $$;
