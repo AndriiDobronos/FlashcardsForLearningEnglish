@@ -43,7 +43,7 @@ export default function Home(){
         supabase.from("user_card_progress").select("card_id,learned,due_at,last_reviewed_at").eq("user_id",userData.user.id),
         supabase.from("review_events").select("created_at").eq("user_id",userData.user.id).gte("created_at",new Date(Date.now()-6*86400000).toISOString()),
       ]);
-      const progress:Progress[]=(remoteProgress??[]).map(item=>({cardId:item.card_id,direction:"en-uk",successCount:0,failureCount:0,dueAt:item.due_at,learned:item.learned,lastReviewedAt:item.last_reviewed_at??undefined}));
+      const progress:Progress[]=(remoteProgress??[]).map(item=>({cardId:item.card_id,direction:"en-uk",successCount:0,failureCount:0,dueAt:item.due_at,learned:item.learned,lastReviewedAt:item.last_reviewed_at??undefined,totalReviews:0,totalKnown:0,totalUnknown:0,sessionKnown:0,sessionUnknown:0,successStreak:0,easeFactor:2.3,intervalDays:0}));
       setStats(calculateStats(progress.length?progress:local,(events??[]) as ReviewEvent[]));
     };
     void load();

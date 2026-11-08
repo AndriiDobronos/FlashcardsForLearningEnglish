@@ -7,17 +7,18 @@ import { loadProgress, mergeProgress, saveProgress, seedCards, type Direction, t
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { loadRemoteProgress, syncReview } from "@/lib/progress-sync";
 import { loadCatalog } from "@/lib/catalog";
+import { buildSessionQueue, insertForLater, isCompletedToday, nextDirection, SESSION_TARGET } from "@/lib/session-planner";
 
 export default function StudyPage() {
-  const [index, setIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [direction, setDirection] = useState<Direction>("en-uk");
-  const [progress, setProgress] = useState<Progress[]>([]);
   const [cards, setCards] = useState(seedCards);
+  const [progress, setProgress] = useState<Progress[]>([]);
+  const [shownCount, setShownCount] = useState(0);
+  const [flipped, setFlipped] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const touchStartX = useRef<number | null>(null);
   const suppressClick = useRef(false);
-  const card = useMemo(() => cards[index % cards.length] ?? seedCards[0], [cards, index]);
+  const card = useMemo(() => cards[0] ?? seedCards[0], [cards]);
+  const direction: Direction = nextDirection(progress, card.id);
 
   useEffect(() => {
     let active = true;
@@ -39,26 +40,16 @@ export default function StudyPage() {
           }
         }
       }
-      let selectedCardIds: string[] = [];
-      let selectedThemes: string[] = [];
-      try {
-        selectedCardIds = JSON.parse(localStorage.getItem("wordly-selected-cards-v1") ?? "[]");
-        selectedThemes = JSON.parse(localStorage.getItem("wordly-selected-v1") ?? "[]");
-      } catch {}
+
       const { cards: catalogCards } = await loadCatalog();
-      const selectedPool = selectedCardIds.length
-        ? catalogCards.filter((item) => selectedCardIds.includes(item.id))
-        : selectedThemes.length
-          ? catalogCards.filter((item) => selectedThemes.includes(item.theme))
-          : catalogCards;
-      const pool = selectedPool.length ? selectedPool : catalogCards;
-      const dueCards = pool.filter((item) => {
+      const dueCards = catalogCards.filter((item) => {
         const itemProgress = availableProgress.filter((entry) => entry.cardId === item.id);
         return itemProgress.length === 0 || itemProgress.some((entry) => !entry.learned && isDue(entry));
       });
+      const queue = buildSessionQueue(dueCards.length ? dueCards : catalogCards, availableProgress);
       if (active) {
         setProgress(availableProgress);
-        setCards(dueCards.length ? dueCards : pool);
+        setCards(queue);
       }
     };
     void initialize();
@@ -84,12 +75,12 @@ export default function StudyPage() {
   }, [card.id, englishVisible, speakEnglish]);
 
   const review = async (known: boolean) => {
+    if (!cards.length || shownCount >= SESSION_TARGET) return;
     const current = progress.find((item) => item.cardId === card.id && item.direction === direction);
     const next = applyReview(current, card.id, direction, known);
-    const other = progress.find((item) => item.cardId === card.id && item.direction !== direction);
-    const completedToday = next.successCount >= 2 && (other?.successCount ?? 0) >= 2;
-    next.learned = completedToday;
     const updated = [...progress.filter((item) => !(item.cardId === card.id && item.direction === direction)), next];
+    const completedToday = isCompletedToday(updated, card.id);
+    next.learned = completedToday;
     setProgress(updated);
     saveProgress(updated);
 
@@ -113,15 +104,12 @@ export default function StudyPage() {
       }
     }
 
-    const currentIndex = index % cards.length;
-    if (completedToday) {
-      const remainingCards = cards.filter((item) => item.id !== card.id);
-      setCards(remainingCards);
-      setIndex(remainingCards.length ? Math.min(currentIndex, remainingCards.length - 1) : 0);
-    } else {
-      setIndex(index + 1);
-    }
-    setDirection(known ? (direction === "en-uk" ? "uk-en" : "en-uk") : direction);
+    const remaining = cards.slice(1).filter((item) => item.id !== card.id);
+    const nextQueue = completedToday || shownCount + 1 >= SESSION_TARGET
+      ? remaining
+      : insertForLater(remaining, card);
+    setCards(nextQueue);
+    setShownCount((count) => count + 1);
     setFlipped(false);
   };
 
@@ -138,8 +126,8 @@ export default function StudyPage() {
     void review(delta > 0);
   };
 
-  if (!cards.length) {
-    return <div className="study-layout"><div className="eyebrow">Сесію завершено</div><h2>Усі картки на сьогодні пройдені 🎉</h2><p>Повернися завтра, щоб продовжити повторення.</p><Link href="/" className="button">До прогресу</Link></div>;
+  if (!cards.length || shownCount >= SESSION_TARGET) {
+    return <div className="study-layout"><div className="eyebrow">Сесію завершено</div><h2>Усі заплановані повторення виконані 🎉</h2><p>Сьогодні виконано {shownCount} із приблизно {SESSION_TARGET} показів. Повернися завтра, щоб продовжити.</p><Link href="/" className="button">До прогресу</Link></div>;
   }
 
   const flipCard = () => {

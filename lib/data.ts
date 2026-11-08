@@ -1,6 +1,23 @@
 export type Direction = "en-uk" | "uk-en";
 export type Card = { id:string; theme:string; themeLabel:string; en:string; uk:string; example:string; emoji:string; imageUrl?:string };
-export type Progress = { cardId:string; direction:Direction; successCount:number; failureCount:number; dueAt:string; learned:boolean; lastReviewedAt?:string };
+export type Progress = {
+ cardId:string;
+ direction:Direction;
+ successCount:number;
+ failureCount:number;
+ dueAt:string;
+ learned:boolean;
+ lastReviewedAt?:string;
+ totalReviews:number;
+ totalKnown:number;
+ totalUnknown:number;
+ sessionKnown:number;
+ sessionUnknown:number;
+ successStreak:number;
+ easeFactor:number;
+ intervalDays:number;
+ lastSessionDate?:string;
+};
 export const seedCards: Card[] = [
  {id:"travel-001",theme:"travel",themeLabel:"Подорожі",en:"to figure out",uk:"розібратися, зрозуміти",example:"I need time to figure out this problem.",emoji:"🧭"},
  {id:"travel-002",theme:"travel",themeLabel:"Подорожі",en:"a fresh start",uk:"новий початок",example:"Moving to a new city felt like a fresh start.",emoji:"🌅"},
@@ -34,7 +51,7 @@ export const seedCards: Card[] = [
  {id:"verbs-006",theme:"verbs",themeLabel:"Фразові дієслова",en:"work out",uk:"вийти, скластися",example:"Everything will work out in the end.",emoji:"✅"}
 ];
 const KEY="wordly-progress-v1";
-export function loadProgress(): Progress[]{if(typeof window==="undefined")return[];try{return JSON.parse(localStorage.getItem(KEY)??"[]") as Progress[]}catch{return[]}}
+export function loadProgress(): Progress[]{if(typeof window==="undefined")return[];try{return (JSON.parse(localStorage.getItem(KEY)??"[]") as Partial<Progress>[]).map(item=>({...item,totalReviews:item.totalReviews??((item.successCount??0)+(item.failureCount??0)),totalKnown:item.totalKnown??item.successCount??0,totalUnknown:item.totalUnknown??item.failureCount??0,sessionKnown:item.sessionKnown??0,sessionUnknown:item.sessionUnknown??0,successStreak:item.successStreak??0,easeFactor:item.easeFactor??2.3,intervalDays:item.intervalDays??0})) as Progress[]}catch{return[]}}
 export function saveProgress(progress:Progress[]){if(typeof window!=="undefined")localStorage.setItem(KEY,JSON.stringify(progress))}
 
 export function mergeProgress(local:Progress[], remote:Progress[]):Progress[]{
