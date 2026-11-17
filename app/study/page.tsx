@@ -16,6 +16,7 @@ export default function StudyPage() {
   const [shownCount, setShownCount] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const card = useMemo(() => cards[0] ?? seedCards[0], [cards]);
@@ -78,7 +79,9 @@ export default function StudyPage() {
   }, [card.id, englishVisible, speakEnglish]);
 
   const review = async (known: boolean) => {
-    if (!cards.length || shownCount >= SESSION_TARGET) return;
+    if (!cards.length || shownCount >= SESSION_TARGET || isAdvancing) return;
+    setIsAdvancing(true);
+    setFlipped(false);
     const current = progress.find((item) => item.cardId === card.id && item.direction === direction);
     const next = applyReview(current, card.id, direction, known);
     const updated = [...progress.filter((item) => !(item.cardId === card.id && item.direction === direction)), next];
@@ -87,33 +90,36 @@ export default function StudyPage() {
     setProgress(updated);
     saveProgress(updated);
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setSyncMessage("Локальний режим: Supabase не підключено");
-    } else {
-      const { data, error: authError } = await supabase.auth.getUser();
-      if (authError || !data.user) {
-        setSyncMessage("Увійдіть через email, щоб синхронізувати прогрес");
-      } else {
-        try {
-          await syncReview(data.user.id, card.id, direction, known, next);
-          setSyncMessage("");
-        } catch (error) {
-          console.error("Supabase progress sync failed", error);
-          const details = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Невідома помилка Supabase";
-          const code = typeof error === "object" && error !== null && "code" in error ? ` [код ${String(error.code)}]` : "";
-          setSyncMessage(`Помилка синхронізації: ${details}${code}`);
-        }
-      }
-    }
-
     const remaining = cards.slice(1).filter((item) => item.id !== card.id);
     const nextQueue = completedToday || shownCount + 1 >= SESSION_TARGET
       ? remaining
       : insertForLater(remaining, card);
     setCards(nextQueue);
     setShownCount((count) => count + 1);
-    setFlipped(false);
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setSyncMessage("Локальний режим: Supabase не підключено");
+      setIsAdvancing(false);
+      return;
+    }
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data.user) {
+      setSyncMessage("Увійдіть через email, щоб синхронізувати прогрес");
+      setIsAdvancing(false);
+      return;
+    }
+    try {
+      await syncReview(data.user.id, card.id, direction, known, next);
+      setSyncMessage("");
+    } catch (error) {
+      console.error("Supabase progress sync failed", error);
+      const details = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Невідома помилка Supabase";
+      const code = typeof error === "object" && error !== null && "code" in error ? ` [код ${String(error.code)}]` : "";
+      setSyncMessage(`Помилка синхронізації: ${details}${code}`);
+    } finally {
+      setIsAdvancing(false);
+    }
   };
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -134,6 +140,7 @@ export default function StudyPage() {
   }
 
   const flipCard = () => {
+    if (isAdvancing) return;
     if (suppressClick.current) {
       suppressClick.current = false;
       return;
@@ -154,9 +161,9 @@ export default function StudyPage() {
           <div className="word">{flipped ? (direction === "en-uk" ? card.uk : card.en) : (direction === "en-uk" ? card.en : card.uk)}</div>
           {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
           {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
-          {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
-            <button className="card-chevron left" type="button" onClick={(event) => { event.stopPropagation(); void review(false); }} aria-label="Ще не знаю">‹</button>
-            <button className="card-chevron right" type="button" onClick={(event) => { event.stopPropagation(); void review(true); }} aria-label="Знаю">›</button>
+          {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
+            <button className="card-chevron left" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; void review(false); }} aria-label="Ще не знаю">‹</button>
+            <button className="card-chevron right" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; void review(true); }} aria-label="Знаю">›</button>
           </div>}
         </div>
       </div>
