@@ -17,6 +17,8 @@ export default function StudyPage() {
   const [flipped, setFlipped] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [isAdvancing, setIsAdvancing] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+  const transitionLock = useRef(false);
   const touchStartX = useRef<number | null>(null);
   const suppressClick = useRef(false);
   const card = useMemo(() => cards[0] ?? seedCards[0], [cards]);
@@ -79,7 +81,7 @@ export default function StudyPage() {
   }, [card.id, englishVisible, speakEnglish]);
 
   const review = async (known: boolean) => {
-    if (!cards.length || shownCount >= SESSION_TARGET || isAdvancing) return;
+    if (!cards.length || shownCount >= SESSION_TARGET) return;
     setIsAdvancing(true);
     setFlipped(false);
     const current = progress.find((item) => item.cardId === card.id && item.direction === direction);
@@ -96,17 +98,24 @@ export default function StudyPage() {
       : insertForLater(remaining, card);
     setCards(nextQueue);
     setShownCount((count) => count + 1);
+    setIsAdvancing(false);
+    setSwipeDirection(null);
+    transitionLock.current = false;
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setSyncMessage("Локальний режим: Supabase не підключено");
       setIsAdvancing(false);
+      setSwipeDirection(null);
+      transitionLock.current = false;
       return;
     }
     const { data, error: authError } = await supabase.auth.getUser();
     if (authError || !data.user) {
       setSyncMessage("Увійдіть через email, щоб синхронізувати прогрес");
       setIsAdvancing(false);
+      setSwipeDirection(null);
+      transitionLock.current = false;
       return;
     }
     try {
@@ -119,7 +128,16 @@ export default function StudyPage() {
       setSyncMessage(`Помилка синхронізації: ${details}${code}`);
     } finally {
       setIsAdvancing(false);
+      setSwipeDirection(null);
+      transitionLock.current = false;
     }
+  };
+
+  const triggerReview = (known: boolean) => {
+    if (transitionLock.current || isAdvancing) return;
+    transitionLock.current = true;
+    setSwipeDirection(known ? "right" : "left");
+    window.setTimeout(() => { void review(known); }, 260);
   };
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -132,7 +150,7 @@ export default function StudyPage() {
     touchStartX.current = null;
     if (Math.abs(delta) < 60) return;
     suppressClick.current = true;
-    void review(delta > 0);
+    triggerReview(delta > 0);
   };
 
   if (!cards.length || shownCount >= SESSION_TARGET) {
@@ -156,19 +174,19 @@ export default function StudyPage() {
         <div className="deck-card deck-card-back deck-card-1" aria-hidden="true" />
         <div className="deck-card deck-card-back deck-card-2" aria-hidden="true" />
         <div className="deck-card deck-card-back deck-card-3" aria-hidden="true" />
-        <div className="flashcard" onClick={flipCard} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div className={`flashcard${swipeDirection ? ` swipe-${swipeDirection}` : ""}`} onClick={flipCard} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           <div className="emoji" aria-hidden="true">{card.emoji}</div>
           <div className="word">{flipped ? (direction === "en-uk" ? card.uk : card.en) : (direction === "en-uk" ? card.en : card.uk)}</div>
           {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
           {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
           {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
-            <button className="card-chevron left" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; void review(false); }} aria-label="Ще не знаю">‹</button>
-            <button className="card-chevron right" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; void review(true); }} aria-label="Знаю">›</button>
+            <button className="card-chevron left" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; triggerReview(false); }} aria-label="Ще не знаю">‹</button>
+            <button className="card-chevron right" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; triggerReview(true); }} aria-label="Знаю">›</button>
           </div>}
         </div>
       </div>
       {syncMessage && <p role="status" style={{ color: "#9a3412" }}>{syncMessage}</p>}
-      <div className="mobile-actions">{flipped && <><button className="swipe no" onClick={() => void review(false)} aria-label="Ще не знаю">←</button><button className="swipe yes" onClick={() => void review(true)} aria-label="Знаю">→</button></>}</div>
+      <div className="mobile-actions">{flipped && <><button className="swipe no" onClick={() => triggerReview(false)} aria-label="Ще не знаю">←</button><button className="swipe yes" onClick={() => triggerReview(true)} aria-label="Знаю">→</button></>}</div>
       <Link href="/" className="eyebrow">← До прогресу</Link>
     </div>
   );
