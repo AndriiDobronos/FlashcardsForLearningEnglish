@@ -145,15 +145,20 @@ export default function StudyPage() {
     <div className="study-layout">
       <div className="eyebrow">Сесія на сьогодні</div>
       <h2>Тримай ритм</h2>
-      <div className="flashcard" onClick={flipCard} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        <div className="emoji" aria-hidden="true">{card.emoji}</div>
-        <div className="word">{flipped ? (direction === "en-uk" ? card.uk : card.en) : (direction === "en-uk" ? card.en : card.uk)}</div>
-        {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
-        {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
-        {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
-          <button className="card-chevron left" type="button" onClick={(event) => { event.stopPropagation(); void review(false); }} aria-label="Ще не знаю">‹</button>
-          <button className="card-chevron right" type="button" onClick={(event) => { event.stopPropagation(); void review(true); }} aria-label="Знаю">›</button>
-        </div>}
+      <div className="flashcard-deck">
+        <div className="deck-card deck-card-back deck-card-1" aria-hidden="true" />
+        <div className="deck-card deck-card-back deck-card-2" aria-hidden="true" />
+        <div className="deck-card deck-card-back deck-card-3" aria-hidden="true" />
+        <div className="flashcard" onClick={flipCard} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          <div className="emoji" aria-hidden="true">{card.emoji}</div>
+          <div className="word">{flipped ? (direction === "en-uk" ? card.uk : card.en) : (direction === "en-uk" ? card.en : card.uk)}</div>
+          {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
+          {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
+          {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
+            <button className="card-chevron left" type="button" onClick={(event) => { event.stopPropagation(); void review(false); }} aria-label="Ще не знаю">‹</button>
+            <button className="card-chevron right" type="button" onClick={(event) => { event.stopPropagation(); void review(true); }} aria-label="Знаю">›</button>
+          </div>}
+        </div>
       </div>
       {syncMessage && <p role="status" style={{ color: "#9a3412" }}>{syncMessage}</p>}
       <div className="mobile-actions">{flipped && <><button className="swipe no" onClick={() => void review(false)} aria-label="Ще не знаю">←</button><button className="swipe yes" onClick={() => void review(true)} aria-label="Знаю">→</button></>}</div>
