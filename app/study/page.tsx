@@ -137,7 +137,7 @@ export default function StudyPage() {
     if (transitionLock.current || isAdvancing) return;
     transitionLock.current = true;
     setSwipeDirection(known ? "right" : "left");
-    window.setTimeout(() => { void review(known); }, 260);
+    window.setTimeout(() => { void review(known); }, 365);
   };
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -180,8 +180,8 @@ export default function StudyPage() {
           {englishVisible && !isSentence && <div className="hint">{card.example}</div>}
           {englishVisible && <button type="button" className="repeat-speech" onClick={(event) => { event.stopPropagation(); speakEnglish(); }} aria-label="Прослухати англійською ще раз">🔊</button>}
           {flipped && <div className="desktop-card-actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
-            <button className="card-chevron left" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; triggerReview(false); }} aria-label="Ще не знаю">‹</button>
-            <button className="card-chevron right" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); suppressClick.current = true; triggerReview(true); }} aria-label="Знаю">›</button>
+            <button className="card-chevron left" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); triggerReview(false); }} aria-label="Ще не знаю">‹</button>
+            <button className="card-chevron right" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); triggerReview(true); }} aria-label="Знаю">›</button>
           </div>}
         </div>
       </div>
