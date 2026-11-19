@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { loadCatalog, type Theme } from "@/lib/catalog";
+import { loadArchivedCatalog, loadCatalog, type Theme } from "@/lib/catalog";
 import { seedCards, type Card } from "@/lib/data";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { loadActiveThemeIds, saveActiveThemeIds } from "@/lib/theme-preferences";
 import { isDuplicateCardError, normalizeEnglishText } from "@/lib/card-normalization";
+import { loadAdminActions, loadAdminStatus, type AdminAction } from "@/lib/admin";
 
 export default function SetsPage() {
   const [activeThemes, setActiveThemes] = useState<string[]>([]);
@@ -16,6 +17,9 @@ export default function SetsPage() {
   const [search, setSearch] = useState("");
   const [catalogError, setCatalogError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [archivedCards, setArchivedCards] = useState<Card[]>([]);
+  const [adminActions, setAdminActions] = useState<AdminAction[]>([]);
   const [deleteCandidate, setDeleteCandidate] = useState<Card | null>(null);
   const [deleteMessage, setDeleteMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -35,6 +39,12 @@ export default function SetsPage() {
       if (supabase) {
         const { data } = await supabase.auth.getUser();
         setUserId(data.user?.id ?? null);
+        const admin = await loadAdminStatus();
+        setIsAdmin(admin);
+        if (admin) {
+          setArchivedCards(await loadArchivedCatalog());
+          setAdminActions(await loadAdminActions());
+        }
       }
     };
     void load();
@@ -94,7 +104,9 @@ export default function SetsPage() {
       setSavingEdit(false);
       return;
     }
-    const { error } = await supabase.from("cards").update({ english_text: values.en, ukrainian_text: values.uk, example_sentence: values.example, emoji: values.emoji }).eq("id", editCandidate.id).eq("created_by", userId);
+    let updateQuery = supabase.from("cards").update({ english_text: values.en, ukrainian_text: values.uk, example_sentence: values.example, emoji: values.emoji }).eq("id", editCandidate.id);
+    if (!isAdmin) updateQuery = updateQuery.eq("created_by", userId);
+    const { error } = await updateQuery;
     if (error) {
       setEditMessage(isDuplicateCardError(error) ? "Така картка вже існує у словнику. Зміни не збережено." : `Не вдалося зберегти зміни: ${error.message}`);
       setSavingEdit(false);
@@ -109,19 +121,35 @@ export default function SetsPage() {
     if (!deleteCandidate) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !userId) {
-      setDeleteMessage("Увійдіть через email, щоб видаляти власні картки.");
+      setDeleteMessage("Увійдіть через email, щоб керувати картками.");
       return;
     }
     setDeleting(true);
-    const { error } = await supabase.from("cards").delete().eq("id", deleteCandidate.id).eq("created_by", userId);
-    if (error) {
-      setDeleteMessage(`Не вдалося видалити картку: ${error.message}`);
+    const archiveResult = isAdmin
+      ? await supabase.rpc("admin_archive_card", { p_card_id: deleteCandidate.id })
+      : await supabase.from("cards").update({ archived_at: new Date().toISOString() }).eq("id", deleteCandidate.id).eq("created_by", userId).select("id").maybeSingle();
+    const archiveSucceeded = isAdmin ? archiveResult.data === true : Boolean(archiveResult.data);
+    if (archiveResult.error || !archiveSucceeded) {
+      setDeleteMessage(`Не вдалося прибрати картку: ${archiveResult.error?.message ?? "операцію відхилено"}`);
       setDeleting(false);
       return;
     }
+    const archivedCard = { ...deleteCandidate, archivedAt: new Date().toISOString() };
     setCards((current) => current.filter((card) => card.id !== deleteCandidate.id));
+    setArchivedCards((current) => [archivedCard, ...current]);
+    setAdminActions(await loadAdminActions());
     setDeleteCandidate(null);
     setDeleting(false);
+  };
+
+  const restoreCard = async (card: Card) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !isAdmin) return;
+    const { data: restored, error } = await supabase.rpc("admin_restore_card", { p_card_id: card.id });
+    if (error || restored !== true) return;
+    setArchivedCards((current) => current.filter((item) => item.id !== card.id));
+    setCards((current) => [...current, { ...card, archivedAt: undefined }]);
+    setAdminActions(await loadAdminActions());
   };
 
   return <div>
@@ -150,12 +178,19 @@ export default function SetsPage() {
     </div>
     <div className="theme-grid">
       {visibleCards.map((card) => <div className="theme-card" key={card.id}>
-        {userId && card.createdBy === userId && <div className="card-tools"><button type="button" className="edit-card-button" aria-label={`Редагувати картку ${card.en}`} onClick={(event) => requestEdit(event, card)}>✎</button><button type="button" className="delete-card-button" aria-label={`Видалити картку ${card.en}`} onClick={(event) => requestDelete(event, card)}>×</button></div>}
+        {userId && (isAdmin || card.createdBy === userId) && <div className="card-tools"><button type="button" className="edit-card-button" aria-label={`Редагувати картку ${card.en}`} onClick={(event) => requestEdit(event, card)}>✎</button><button type="button" className="delete-card-button" aria-label={`Архівувати картку ${card.en}`} onClick={(event) => requestDelete(event, card)}>×</button></div>}
         <div className="emoji">{card.emoji}</div><h3>{card.en}</h3><p>{card.uk}</p><small style={{ display: "block", marginTop: 16, color: "#6b7d77" }}>{card.themeLabel}</small>
       </div>)}
     </div>
 
-    {deleteCandidate && <div className="modal-backdrop" role="presentation" onMouseDown={() => { if (!deleting) setDeleteCandidate(null); }}><div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="delete-title">Видалити власну картку?</h2><p>Картку «{deleteCandidate.en}» буде видалено з каталогу.</p>{deleteMessage && <p className="delete-error" role="alert">{deleteMessage}</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setDeleteCandidate(null)} disabled={deleting}>Скасувати</button><button type="button" className="button danger" onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? "Видаляю…" : "Так, видалити"}</button></div></div></div>}
+    {isAdmin && <section className="admin-panel panel">
+      <div className="section-row"><div><div className="eyebrow">Адміністрування</div><h2>Архівні картки</h2><p style={{ margin: 0 }}>Їх не видно користувачам, але прогрес і історія збережені.</p></div></div>
+      {archivedCards.length ? <div className="admin-list">{archivedCards.map((card) => <div className="admin-list-row" key={card.id}><span>{card.emoji} <strong>{card.en}</strong><small>{card.uk}</small></span><button type="button" className="button secondary" onClick={() => void restoreCard(card)}>Відновити</button></div>)}</div> : <p>Архів порожній.</p>}
+      <div className="section-row admin-log-heading"><div><h2>Журнал дій</h2><p style={{ margin: 0 }}>Останні адміністративні операції.</p></div></div>
+      {adminActions.length ? <div className="admin-list">{adminActions.map((item) => <div className="admin-list-row" key={item.id}><span>{item.action === "archive_card" ? "🗄️ Прибрано" : "↩️ Відновлено"} · {item.cardId ?? "картка недоступна"}</span><small>{new Date(item.createdAt).toLocaleString("uk-UA")}</small></div>)}</div> : <p>Дій ще не було.</p>}
+    </section>}
+
+    {deleteCandidate && <div className="modal-backdrop" role="presentation" onMouseDown={() => { if (!deleting) setDeleteCandidate(null); }}><div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="delete-title">Прибрати картку зі словника?</h2><p>Картка «{deleteCandidate.en}» зникне з каталогу. Прогрес користувачів і історія повторень залишаться збереженими.</p>{deleteMessage && <p className="delete-error" role="alert">{deleteMessage}</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setDeleteCandidate(null)} disabled={deleting}>Скасувати</button><button type="button" className="button danger" onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? "Прибираю…" : "Так, прибрати"}</button></div></div></div>}
     {editCandidate && <div className="modal-backdrop" role="presentation" onMouseDown={() => { if (!savingEdit) setEditCandidate(null); }}><div className="confirm-modal edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="edit-title">Редагувати картку</h2><label htmlFor="edit-english">Англійський текст</label><input id="edit-english" value={editForm.en} onChange={(event) => setEditForm({ ...editForm, en: event.target.value })} /><label htmlFor="edit-ukrainian">Український переклад</label><input id="edit-ukrainian" value={editForm.uk} onChange={(event) => setEditForm({ ...editForm, uk: event.target.value })} /><label htmlFor="edit-example">Приклад речення</label><textarea id="edit-example" rows={3} value={editForm.example} onChange={(event) => setEditForm({ ...editForm, example: event.target.value })} /><label htmlFor="edit-emoji">Емоджі</label><input id="edit-emoji" value={editForm.emoji} onChange={(event) => setEditForm({ ...editForm, emoji: event.target.value })} maxLength={8} />{editMessage && <p className="delete-error" role="alert">{editMessage}</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setEditCandidate(null)} disabled={savingEdit}>Скасувати</button><button type="button" className="button" onClick={() => void saveEdit()} disabled={savingEdit}>{savingEdit ? "Зберігаю…" : "Зберегти"}</button></div></div></div>}
   </div>;
 }

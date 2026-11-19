@@ -18,7 +18,7 @@ export async function loadCatalog():Promise<{themes:Theme[];cards:Card[];error?:
 
   const[{data:themeRows,error:themeError},{data:cardRows,error:cardError}]=await Promise.all([
     supabase.from("themes").select("id,title,description,emoji").order("title"),
-    supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence,emoji,created_by").order("created_at"),
+    supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence,emoji,created_by").is("archived_at", null).order("created_at"),
   ]);
 
   if(themeError||cardError||!themeRows?.length||!cardRows?.length){
@@ -42,4 +42,25 @@ export async function loadCatalog():Promise<{themes:Theme[];cards:Card[];error?:
   cards.forEach(card=>counts.set(card.theme,(counts.get(card.theme)??0)+1));
   const themes:Theme[]=themeRows.map(theme=>({id:theme.id,title:theme.title,description:theme.description,emoji:theme.emoji,cardCount:counts.get(theme.id)??0}));
   return {themes,cards};
+}
+
+export async function loadArchivedCatalog(): Promise<Card[]> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return [];
+  const [{ data: themeRows }, { data: cardRows }] = await Promise.all([
+    supabase.from("themes").select("id,title,description,emoji"),
+    supabase.from("cards").select("id,theme_id,english_text,ukrainian_text,example_sentence,emoji,created_by,archived_at").not("archived_at", "is", null).order("archived_at", { ascending: false }),
+  ]);
+  const themeMap = new Map((themeRows ?? []).map((theme) => [theme.id, theme]));
+  return (cardRows ?? []).map((card) => ({
+    id: card.id,
+    theme: card.theme_id,
+    themeLabel: themeMap.get(card.theme_id)?.title ?? card.theme_id,
+    en: card.english_text,
+    uk: card.ukrainian_text,
+    example: card.example_sentence,
+    emoji: card.emoji ?? themeMap.get(card.theme_id)?.emoji ?? "📚",
+    createdBy: card.created_by ?? undefined,
+    archivedAt: card.archived_at ?? undefined,
+  }));
 }
