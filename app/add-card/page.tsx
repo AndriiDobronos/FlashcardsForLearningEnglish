@@ -5,6 +5,7 @@ import Link from "next/link";
 import { loadCatalog, type Theme } from "@/lib/catalog";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { suggestEmojis, suggestEmojisFromFullIndex } from "@/lib/emoji-suggestions";
+import { isDuplicateCardError, normalizeEnglishText } from "@/lib/card-normalization";
 
 export default function AddCardPage(){
   const [themes,setThemes]=useState<Theme[]>([]);
@@ -29,11 +30,16 @@ export default function AddCardPage(){
     if(!supabase){setMessage("Supabase не підключено. Перевірте змінні середовища.");return}
     const{data:{user}}=await supabase.auth.getUser();
     if(!user){setMessage("Спочатку увійдіть через email.");return}
+    const englishText = english.trim().replace(/\s+/g, " ");
+    const englishKey = normalizeEnglishText(englishText);
     setSaving(true);
+    const{data:existingCard,error:duplicateCheckError}=await supabase.from("cards").select("id,english_text").eq("english_key",englishKey).limit(1).maybeSingle();
+    if(duplicateCheckError){setSaving(false);setMessage(`Не вдалося перевірити дублювання: ${duplicateCheckError.message}`);return}
+    if(existingCard){setSaving(false);setMessage(`Така картка вже існує у словнику: «${existingCard.english_text}». Збереження скасовано.`);return}
     const id=`${themeId}-${Date.now()}`;
-    const{error}=await supabase.from("cards").insert({id,theme_id:themeId,english_text:english.trim(),ukrainian_text:ukrainian.trim(),example_sentence:example.trim(),emoji:emoji.trim(),image_url:null,created_by:user.id});
+    const{error}=await supabase.from("cards").insert({id,theme_id:themeId,english_text:englishText,ukrainian_text:ukrainian.trim(),example_sentence:example.trim(),emoji:emoji.trim(),image_url:null,created_by:user.id});
     setSaving(false);
-    if(error){setMessage(`Не вдалося додати картку: ${error.message}`);return}
+    if(error){setMessage(isDuplicateCardError(error)?"Така картка вже існує у словнику. Збереження скасовано.":`Не вдалося додати картку: ${error.message}`);return}
     setEnglish("");setUkrainian("");setExample("");setEmoji("");setEmojiManuallySelected(false);
     setMessage("Картку додано. Відкрийте /sets і оновіть сторінку, щоб обрати її до набору.");
   };

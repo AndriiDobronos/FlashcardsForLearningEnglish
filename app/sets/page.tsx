@@ -6,6 +6,7 @@ import { loadCatalog, type Theme } from "@/lib/catalog";
 import { seedCards, type Card } from "@/lib/data";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { loadActiveThemeIds, saveActiveThemeIds } from "@/lib/theme-preferences";
+import { isDuplicateCardError, normalizeEnglishText } from "@/lib/card-normalization";
 
 export default function SetsPage() {
   const [activeThemes, setActiveThemes] = useState<string[]>([]);
@@ -70,7 +71,7 @@ export default function SetsPage() {
       setEditMessage("Увійдіть через email, щоб редагувати власні картки.");
       return;
     }
-    const values = { en: editForm.en.trim(), uk: editForm.uk.trim(), example: editForm.example.trim(), emoji: editForm.emoji.trim() };
+    const values = { en: editForm.en.trim().replace(/\s+/g, " "), uk: editForm.uk.trim(), example: editForm.example.trim(), emoji: editForm.emoji.trim() };
     if (!values.en || !values.uk || !values.example || !values.emoji) {
       setEditMessage("Заповніть усі поля.");
       return;
@@ -81,9 +82,21 @@ export default function SetsPage() {
       return;
     }
     setSavingEdit(true);
+    const englishKey = normalizeEnglishText(values.en);
+    const { data: duplicateCard, error: duplicateCheckError } = await supabase.from("cards").select("id,english_text").eq("english_key", englishKey).neq("id", editCandidate.id).limit(1).maybeSingle();
+    if (duplicateCheckError) {
+      setEditMessage(`Не вдалося перевірити дублювання: ${duplicateCheckError.message}`);
+      setSavingEdit(false);
+      return;
+    }
+    if (duplicateCard) {
+      setEditMessage(`Така картка вже існує у словнику: «${duplicateCard.english_text}».`);
+      setSavingEdit(false);
+      return;
+    }
     const { error } = await supabase.from("cards").update({ english_text: values.en, ukrainian_text: values.uk, example_sentence: values.example, emoji: values.emoji }).eq("id", editCandidate.id).eq("created_by", userId);
     if (error) {
-      setEditMessage(`Не вдалося зберегти зміни: ${error.message}`);
+      setEditMessage(isDuplicateCardError(error) ? "Така картка вже існує у словнику. Зміни не збережено." : `Не вдалося зберегти зміни: ${error.message}`);
       setSavingEdit(false);
       return;
     }
